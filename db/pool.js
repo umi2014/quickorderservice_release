@@ -2,9 +2,9 @@ const mysql = require('mysql2');
 
 // 接続プールの作成
 const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'ordersystem',
-  password: '2wsxCDE#',
+  host: '127.0.0.1',
+  user: 'orderdada',
+  password: 'zaq1CDE#',
   database: 'quickorderdb',
   waitForConnections: true,
   connectionLimit: 50,
