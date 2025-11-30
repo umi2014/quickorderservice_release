@@ -13,7 +13,7 @@ const emailsInfoRouter = require('./routes/emailsInfoController.js');
 const PORT = 3060;
 // CORS設定
 const corsOptions = {
-  origin: 'http://167.71.154.27:3060', // 許可するオリジン
+  origin: ['http://167.71.154.27', 'https://167.71.154.27'], // 許可するオリジン
   credentials: true,              // クッキーや認証情報を許可
 };
 app.use(cors(corsOptions));
@@ -31,6 +31,6 @@ app.use('/ENT0201', emailsInfoRouter);
 app.use('/ENT0212', orderInfoRouter);
 
 // サーバーの起動
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://167.71.154.27:${PORT}`);
 });
