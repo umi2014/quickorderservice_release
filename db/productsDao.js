@@ -16,7 +16,7 @@ class ProductsDao {
       var sql = "SELECT * FROM products WHERE SHOP_ID = ? ";
       console.debug("SQL:" + sql);
       console.debug("PARAM:" + shopId);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, [shopId]);
       if (results && results.length > 0){
         console.debug("result:" + results[0].length);

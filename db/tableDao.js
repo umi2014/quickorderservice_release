@@ -22,7 +22,7 @@ class TableDao {
       }
       console.debug("SQL:" + sql);
       console.debug("PARAM:" + param);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, param);
       if (results && results.length > 0) {
         console.debug("result:" + results[0].length);
@@ -49,7 +49,7 @@ class TableDao {
       console.debug("SQL:" + sql);
       var param = [table.SHOP_ID, table.TABLE_ICON, table.TABLE_NAME, table.TABLE_MESSAGE, "0"];
       console.debug("PARAM:" + param);
-      const results = await this.pool.promise().query(sql, param);
+      const results = await this.pool.query(sql, param);
 
       if (results && results.length > 0) {
         console.debug("result:" + results[0].length);
@@ -76,7 +76,7 @@ class TableDao {
       console.debug("SQL:" + sql);
       var param = [table.TABLE_ICON, table.TABLE_NAME, table.TABLE_MESSAGE, table.DELETE_FLG, table.TABLE_ID];
       console.debug("PARAM:" + param);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, param);
       if (results && results.length > 0) {
         console.debug("result:" + results[0].length);
@@ -102,7 +102,7 @@ class TableDao {
       var sql = "DELETE from tables WHERE TABLE_ID = ? ";
       console.debug("SQL:" + sql);
       console.debug("PARAM:" + table.TABLE_ID);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, [table.TABLE_ID]);
       if (results && results.length > 0) {
         console.debug("result:" + results[0].length);

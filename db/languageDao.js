@@ -16,7 +16,7 @@ class LanguageDao {
       var sql = "SELECT * FROM languages WHERE SHOP_ID in (0,?)";
       console.debug("SQL:" + sql);
       console.debug("PARAM:" + shopId);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, [shopId]);
       if (results && results.length > 0){
         console.debug("result:" + results[0].length);

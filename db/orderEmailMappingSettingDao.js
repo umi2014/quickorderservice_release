@@ -19,7 +19,7 @@ class OrderEmailMappingSetting {
       var params = [shopId];
       console.debug("SQL:" + sql);
       console.debug("PARAM:" + params);
-      const results = await this.pool.promise().query(sql, params);
+      const results = await this.pool.query(sql, params);
       if (results && results.length > 0) {
         console.debug("result:" + results[0].length);
         return results[0];

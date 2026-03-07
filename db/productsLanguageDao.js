@@ -13,10 +13,10 @@ class ProductsLanguageDao {
   async getLanguagesByProductId(productId) {
     try {
       // クエリの実行
-      var sql = "SELECT * FROM product_language WHERE PRODUCT_ID = ? order by LANGUAGE_TYPE";
+      var sql = "SELECT LANGUAGE_ID,PRODUCT_ID,LANGUAGE_TYPE,PRODUCT_NAME,CAST(PRODUCT_DETAIL AS CHAR(10000) CHARACTER SET utf8) as PRODUCT_DETAIL FROM product_language WHERE PRODUCT_ID = ? order by LANGUAGE_TYPE";
       console.debug("SQL:" + sql);
       console.debug("PARAM:" + productId );
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, [productId]);
       if (results && results.length > 0){
         console.debug("result:" + results[0].length);

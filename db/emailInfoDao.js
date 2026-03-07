@@ -30,7 +30,7 @@ class EmailInfoDao {
       }
       console.debug("SQL:" + sql);
       console.debug("PARAM:" + param);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, param);
       if (results && results.length > 0) {
         console.debug("result:" + results[0].length);
@@ -58,7 +58,7 @@ class EmailInfoDao {
       param.push(mailId);
       console.debug("SQL:" + sql);
       console.debug("PARAM:" + param);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, param);
       if (results && results.length > 0) {
         console.debug("result:" + results[0].length);
@@ -85,7 +85,7 @@ class EmailInfoDao {
       console.debug("SQL:" + sql);
       var param = [email.SHOP_ID, email.EMAIL_ADDRESS, email.SUBJECT, email.CONTENT, email.FROM, email.DATE, "0", "0"];
       console.debug("PARAM:" + param);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, param);
       if (results && results.length > 0) {
         console.debug("result:" + results[0].length);
@@ -112,7 +112,7 @@ class EmailInfoDao {
       console.debug("SQL:" + sql);
       var param = [email.TORIKOMI_FLG, email.EMAIL_ID];
       console.debug("PARAM:" + param);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, param);
       if (results && results.length > 0) {
         console.debug("result:" + results[0].length);
@@ -138,7 +138,7 @@ class EmailInfoDao {
       var sql = "DELETE from emails WHERE EMAIL_ID = ? ";
       console.debug("SQL:" + sql);
       console.debug("PARAM:" + email.EMAIL_ID);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, [email.EMAIL_ID]);
       if (results && results.length > 0) {
         console.debug("result:" + results[0].length);

@@ -16,7 +16,7 @@ class EmailSettingDao {
       var sql = "SELECT * FROM email_settings WHERE SHOP_ID = ? ";
       console.debug("SQL:" + sql);
       console.debug("PARAM:" + shopId);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, [shopId]);
       if (results && results.length > 0) {
         console.debug("result:" + results[0].length);
@@ -43,7 +43,7 @@ class EmailSettingDao {
       console.debug("SQL:" + sql);
       var param = [emailSetting.SHOP_ID, emailSetting.EMAIL_ADDRESS, emailSetting.PASSWORD, emailSetting.RECEIVE_SERVER, emailSetting.RECEIVE_PORT, emailSetting.SEND_SERVER, emailSetting.SEND_PORT, emailSetting.SSL_TLS_FLG, emailSetting.RECEIVE_SPA_AUTH_FLG, emailSetting.ENCRYPTION_METHOD, emailSetting.SEND_SPA_AUTH_FLG, "0"];
       console.debug("PARAM:" + param);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, param);
       if (results && results.length > 0) {
         console.debug("result:" + results[0].length);
@@ -70,7 +70,7 @@ class EmailSettingDao {
       console.debug("SQL:" + sql);
       var param = [emailSetting.EMAIL_ADDRESS, emailSetting.PASSWORD, emailSetting.RECEIVE_SERVER, emailSetting.RECEIVE_PORT, emailSetting.SEND_SERVER, emailSetting.SEND_PORT, emailSetting.SSL_TLS_FLG, emailSetting.RECEIVE_SPA_AUTH_FLG, emailSetting.ENCRYPTION_METHOD, emailSetting.SEND_SPA_AUTH_FLG, emailSetting.EMAIL_SETTING_ID];
       console.debug("PARAM:" + param);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, param);
       if (results && results.length > 0) {
         console.debug("result:" + results[0].length);
@@ -96,7 +96,7 @@ class EmailSettingDao {
       var sql = "DELETE from email_settings WHERE EMAIL_SETTING_ID = ? ";
       console.debug("SQL:" + sql);
       console.debug("PARAM:" + emailSetting.EMAIL_SETTING_ID);
-      const results = await this.pool.promise().query(
+      const results = await this.pool.query(
         sql, [emailSetting.EMAIL_SETTING_ID]);
       if (results && results.length > 0) {
         console.debug("result:" + results[0]);

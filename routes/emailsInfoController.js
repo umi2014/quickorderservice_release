@@ -100,8 +100,12 @@ router.post('/05/', async (req, res) => {
     var orderEmailMappingSettings = await emailInfoService.getOrderEmailMappingSettings(corporationId);
     for (var i = 0; i < mailInfoList.length; i++) {
       var mainInfo = mailInfoList[i];
-      await emailInfoService.analysitMailToOrder(mainInfo, orderEmailMappingSettings);
-      mainInfo.TORIKOMI_FLG = "1";
+      var result = await emailInfoService.analysitMailToOrder(mainInfo, orderEmailMappingSettings);
+      if (result == 1) {
+        mainInfo.TORIKOMI_FLG = "1";
+      } else {
+        mainInfo.TORIKOMI_FLG = "2";
+      }
       await emailInfoService.updEmailInfoStatus(mainInfo);
     }
     var data = {}

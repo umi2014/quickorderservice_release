@@ -1,4 +1,5 @@
 const imaps = require("imap-simple");
+const pool = require('../db/pool');
 const { simpleParser } = require("mailparser");
 const EmailSettingDao = require("../db/emailSettingDao.js");
 const emailSettingDao = new EmailSettingDao();
@@ -10,6 +11,8 @@ const TableDao = require("../db/tableDao.js");
 const tableDao = new TableDao();
 const OrderDao = require("../db/orderDao.js");
 const orderDao = new OrderDao();
+const OrderDetailDao = require("../db/orderDetailDao.js");
+const orderDetailDao = new OrderDetailDao();
 
 class EmailInfoService {
   /**
@@ -136,130 +139,194 @@ class EmailInfoService {
     return orderEmailMappingSettings;
   }
 
-  /**
-   * 指定したメール情報をオーダ情報に取り込む
-   * @param {Promise} emailInfo メール情報
-   * @param {Promise} orderEmailMappingSettings メール設定情報リスト
-   * @returns {number} 更新件数
-   */
   async analysitMailToOrder(emailInfo, orderEmailMappingSettings) {
-    var orderInfo = {};
-    console.debug("analysitMailToOrder start:" + emailInfo);
-    if (orderEmailMappingSettings.length < 10) {
-      return null;
+    console.debug(`[Start] Parsing Email ID: ${emailInfo.EMAIL_ID}`);
+
+    if (!orderEmailMappingSettings || orderEmailMappingSettings.length < 10) {
+      console.error("Mapping settings insufficient");
+      return -1;
     }
-    var start = orderEmailMappingSettings[0].START;
-    var end = orderEmailMappingSettings[0].END;
-    orderInfo.EMAIL_ID = emailInfo.EMAIL_ID;
-    orderInfo.SHOP_ID = emailInfo.SHOP_ID;
-    var mailContents = emailInfo.CONTENT.split("\r\n");
-    if (mailContents.length == 1) {
-      mailContents = emailInfo.CONTENT.split("\n");
+
+    try {
+      // 1. 获取或创建桌号 ID
+      const tableId = await this._getOrCreateTable(emailInfo.SHOP_ID, orderEmailMappingSettings[9].START);
+
+      // 2. 解析邮件内容，提取 Header 和 Details
+      const { orderHeader, detailList } = this._parseEmailContent(emailInfo.CONTENT, orderEmailMappingSettings);
+
+      // 3. 完善订单主表信息
+      const systemDate = new Date();
+      const orderData = {
+        ...orderHeader,
+        SHOP_ID: emailInfo.SHOP_ID,
+        EMAIL_ID: emailInfo.EMAIL_ID,
+        TABLE_ID: tableId,
+        YEAR: systemDate.getFullYear(),
+        MONTH: systemDate.getMonth() + 1,
+        DAY: systemDate.getDate(),
+        ORDERED_FLG: "1",
+        PAYED_FLG: "1",
+        DELETE_FLG: "0",
+        ORDER_ID: 0
+      };
+
+      await pool.transaction(async () => {
+        // 4. 执行持久化（主表 -> 明细表）
+        // 这里的 orderDao.insertOrder 必须返回包含 insertId 的对象
+        const result = await orderDao.insertOrder(orderData);
+        const newOrderId = result.ORDER_ID || result; 
+
+        if (newOrderId > 0 && detailList.length > 0) {
+          await orderDetailDao.insertOrderDetails(detailList, newOrderId);
+          console.debug(`[Success] Order ${newOrderId} saved with ${detailList.length} details.`);
+        }
+      });
+      return 1;
+    } catch (error) {
+      console.error("[Error] analysis failed:", error);
+      throw error;
     }
-    var joken = {};
-    joken.SHOP_ID = emailInfo.SHOP_ID;
-    joken.TABLE_NAME = orderEmailMappingSettings[9].START;
-    var tableList = await tableDao.getTableInfoList(joken)
-    if (tableList.length > 0) {
-      orderInfo.TABLE_ID = tableList[0].TABLE_ID;
-    } else {
-      await tableDao.insTableInfo(joken)
-      tableList = await tableDao.getTableInfoList(joken)
-      if (tableList.length > 0) {
-        orderInfo.TABLE_ID = tableList[0].TABLE_ID;
-      } else {
-        return;
-      }
-    }
-    var taishoFlg = 0;
-    orderInfo.CANCEL_FLG = "0";
-    for (var i = 0; i < mailContents.length; i++) {
-      var content = mailContents[i];
-      console.debug("content:" + content);
-      // 8:キー情報
-      if (content.includes(orderEmailMappingSettings[8].START)) {
-        var amont = content.split(orderEmailMappingSettings[8].START);
-        amont = amont[1].split(orderEmailMappingSettings[8].END)
-        orderInfo.ORDER_KEY = amont[0];
-        console.debug("8:キー情報:" + orderInfo.ORDER_KEY);
-      }
-      // 10:▼キャンセル理由
-      if (content.includes(orderEmailMappingSettings[10].START)) {
-        orderInfo.CANCEL_FLG = "1";
-        console.debug("10:▼キャンセル理由:" + orderInfo.CANCEL_FLG);
-      }
-      if (content.includes(start)) {
-        console.debug("start:" + start);
-        taishoFlg = 1;
-      }
-      if (taishoFlg == 1 && content == end) {
-        console.debug("end:" + end);
-        break;
-      }
-      if (taishoFlg == 1) {
-        // 1:商品名
-        if (content.includes(orderEmailMappingSettings[1].START)) {
-          var amont = content.split(orderEmailMappingSettings[1].START);
-          amont = amont[1].split(orderEmailMappingSettings[1].END)
-          orderInfo.PRODUCT_NAME = amont[0];
-          console.debug("1:商品名:" + orderInfo.PRODUCT_NAME);
+  }
+
+/**
+   * 真正驱动化的解析逻辑
+   */
+  _parseEmailContent(content, settings) {
+    const lines = content.split(/\r?\n/);
+    
+    // 从配置中自动寻找边界标记
+    const areaSetting = settings.find(s => s.SETTING_TYPE === 0);
+    const startMarker = areaSetting ? areaSetting.START : null;
+    const endMarker = areaSetting ? areaSetting.END : null;
+
+    let orderHeader = { CANCEL_FLG: "0" };
+    let detailList = [];
+    let currentDetail = null;
+    let isInsideProductArea = false;
+
+    // 分类配置，提高解析效率
+    const headerSettings = settings.filter(s => ![0, 1, 2, 3].includes(s.SETTING_TYPE));
+    const detailSettings = settings.filter(s => [1, 2, 3].includes(s.SETTING_TYPE));
+
+    for (let line of lines) {
+      line = line.trim();
+      if (!line) continue;
+
+      // --- A. 自动解析 Header 信息 ---
+      headerSettings.forEach(set => {
+        if (line.includes(set.START)) {
+          const val = this._extractValue(line, set);
+          // 如果字段名是 CANCEL_FLG，特殊处理
+          if (set.FIELD_NAME === 'CANCEL_FLG') {
+            orderHeader[set.FIELD_NAME] = "1";
+          } else if (set.SETTING_TYPE === 7) { 
+            // 合计金额特殊逻辑：数值和币种
+            orderHeader[set.FIELD_NAME] = this._cleanNum(val);
+            const parts = line.split(set.END);
+            if (parts[1]) orderHeader.PRICE_CURRENCY = parts[1].trim();
+          } else {
+            // 根据字段名自动赋值
+            orderHeader[set.FIELD_NAME] = set.FIELD_NAME.includes('PRICE') || set.FIELD_NAME.includes('TAX') || set.FIELD_NAME.includes('POSTAGE') || set.FIELD_NAME.includes('AMONT')
+              ? this._cleanNum(val) 
+              : val;
+          }
         }
-        // 2:単価
-        else if (content.includes(orderEmailMappingSettings[2].START)) {
-          var amont = content.split(orderEmailMappingSettings[2].START);
-          amont = amont[1].split(orderEmailMappingSettings[2].END)
-          orderInfo.PRICE = amont[0].replace(/[^\d.-]/g, '');
-          console.debug("2:単価:" + orderInfo.PRICE);
-        }
-        // 3:数量
-        if (content.includes(orderEmailMappingSettings[3].START)) {
-          var amont = content.split(orderEmailMappingSettings[3].START);
-          amont = amont[1].split(orderEmailMappingSettings[3].END)
-          orderInfo.NUMBER = amont[0].replace(/[^\d.-]/g, '');
-          console.debug("3:数量:" + orderInfo.NUMBER);
-        }
-        // 4:送料
-        else if (content.includes(orderEmailMappingSettings[4].START)) {
-          var amont = content.split(orderEmailMappingSettings[4].START);
-          amont = amont[1].split(orderEmailMappingSettings[4].END)
-          orderInfo.POSTAGE = amont[0].replace(/[^\d.-]/g, '');
-          console.debug("4:送料:" + orderInfo.POSTAGE);
-        }
-        // 5:追加料金
-        else if (content.includes(orderEmailMappingSettings[5].START)) {
-          var amont = content.split(orderEmailMappingSettings[5].START);
-          amont = amont[1].split(orderEmailMappingSettings[5].END)
-          orderInfo.ADDTIONAl_PRICE = amont[0].replace(/[^\d.-]/g, '');
-          console.debug("5:追加料金:" + orderInfo.ADDTIONAl_PRICE);
-        }
-        // 6:税金
-        else if (content.includes(orderEmailMappingSettings[6].START)) {
-          var amont = content.split(orderEmailMappingSettings[6].START);
-          amont = amont[1].split(orderEmailMappingSettings[6].END)
-          orderInfo.TAX = amont[0].replace(/[^\d.-]/g, '');
-          console.debug("6:税金:" + orderInfo.TAX);
-        }
-        // 7:合計金額
-        else if (content.includes(orderEmailMappingSettings[7].START)) {
-          var amont = content.split(orderEmailMappingSettings[7].START);
-          amont = amont[1].split(orderEmailMappingSettings[7].END)
-          orderInfo.AMONT = amont[0].replace(/[^\d.-]/g, '');
-          orderInfo.PRICE_CURRENCY = amont[1].replace(/[^\d.-]/g, '');
-          console.debug("7:合計金額:" + orderInfo.AMONT);
+      });
+
+      // --- B. 边界切换 ---
+      if (startMarker && line.includes(startMarker)) { isInsideProductArea = true; continue; }
+      if (isInsideProductArea && line === endMarker) { isInsideProductArea = false; break; }
+
+      // --- C. 自动解析明细信息 ---
+      if (isInsideProductArea) {
+        // 遇到 SETTING_TYPE 为 1 的配置，开启新商品
+        const prodNameSetting = settings.find(s => s.SETTING_TYPE === 1);
+        if (line.includes(prodNameSetting.START)) {
+          if (currentDetail) detailList.push(currentDetail);
+          currentDetail = { 
+            [prodNameSetting.FIELD_NAME]: this._extractValue(line, prodNameSetting) 
+          };
+        } 
+        else if (currentDetail) {
+          // 遍历所有属于明细的配置（单价、数量等）
+          detailSettings.filter(s => s.SETTING_TYPE !== 1).forEach(set => {
+            if (line.includes(set.START)) {
+              // if (set.SETTING_TYPE === 3) { // 单价的正则特殊处理
+              //    const afterStart = line.split(set.START)[1];
+              //    const match = afterStart.match(/^\s*(\d+)/);
+              //    if (match) currentDetail[set.FIELD_NAME] = match[1];
+              // } else {
+                 const val = this._extractValue(line, set);
+                 currentDetail[set.FIELD_NAME] = this._cleanNum(val);
+              // }
+            }
+          });
         }
       }
     }
-    if (taishoFlg == 1) {
-      var systemDate = new Date();
-      orderInfo.YEAR = systemDate.getFullYear();
-      orderInfo.MONTH = systemDate.getMonth() + 1;
-      orderInfo.DAY = systemDate.getDate();
-      orderInfo.ORDERED_FLG = "1";
-      orderInfo.PAYED_FLG = "1";
-      orderInfo.DELETE_FLG = "0";
-      var result = await orderDao.insertOrder(orderInfo);
+    headerSettings.forEach(set => {
+      // 備考
+      if (set.FIELD_NAME === 'MEMO') {
+        if (content.includes(set.START)) {
+          const val = this._extractValue(content, set);
+          orderHeader[set.FIELD_NAME] = val;
+        }
+      } else if (set.FIELD_NAME === 'ORDER_UPDATE_FLG') {
+        // 変更フラグ
+        if (content.includes(set.START)) {
+          orderHeader[set.FIELD_NAME] = "1";
+        }
+      } else if (set.FIELD_NAME === 'ORDER_UPDATE_MEMO') {
+        // 変更内容
+        if (content.includes(set.START)) {
+          const val = this._extractValue(content, set);
+          orderHeader[set.FIELD_NAME] = val;
+        }
+      }
+    });
+    if (currentDetail) detailList.push(currentDetail);
+
+    return { orderHeader, detailList };
+  }
+
+  /**
+   * 共通的提取逻辑
+   */
+  _extractValue(line, setting) {
+    try {
+      if (!line.includes(setting.START)) return "";
+      const temp = line.split(setting.START)[1];
+      if (setting.END && temp.includes(setting.END)) {
+        return temp.split(setting.END)[0].trim();
+      }
+      return temp.trim(); // 没有结束符则取剩余全部
+    } catch (e) {
+      return "";
     }
-    return result;
+  }
+
+  // 辅助工具：字段匹配
+  _mapField(line, setting, callback) {
+    if (line.includes(setting.START)) {
+      const val = line.split(setting.START)[1].split(setting.END)[0];
+      callback(val);
+    }
+  }
+
+  // 辅助工具：提取纯数字
+  _cleanNum(str) {
+    return str ? str.replace(/[^\d.-]/g, '') : "0";
+  }
+
+  // 辅助工具：桌号处理
+  async _getOrCreateTable(shopId, tableName) {
+    const joken = { SHOP_ID: shopId, TABLE_NAME: tableName };
+    let list = await tableDao.getTableInfoList(joken);
+    if (list.length === 0) {
+      await tableDao.insTableInfo(joken);
+      list = await tableDao.getTableInfoList(joken);
+    }
+    return list.length > 0 ? list[0].TABLE_ID : null;
   }
 }
 
