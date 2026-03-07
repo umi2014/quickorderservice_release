@@ -6,11 +6,13 @@ const storage = new AsyncLocalStorage();
 
 // 2. 配置连接池
 const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: 'admin',
+  host: '127.0.0.1',
+  user: 'orderdada',
+  password: 'zaq1CDE#',
   database: 'quickorderdb',
-  connectionLimit: 50
+  waitForConnections: true,
+  connectionLimit: 50,
+  queueLimit: 0
 });
 
 const db = {
