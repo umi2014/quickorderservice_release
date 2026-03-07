@@ -31,6 +31,6 @@ app.use('/ENT0201', emailsInfoRouter);
 app.use('/ENT0212', orderInfoRouter);
 
 // サーバーの起動
-app.listen(PORT, '127.0.0.1', () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://167.71.154.27:${PORT}`);
 });
