@@ -1,6 +1,6 @@
-const OrderDao = require("../db/orderDao.js");
-const ProductsLanguageDao = require("../db/productsLanguageDao.js");
-const comEnum = require("../constants/com-enum.js");
+const OrderDao = require('../../order/db/orderDao.js');
+const ProductsLanguageDao = require('../../product/db/productsLanguageDao.js');
+const comEnum = require('../../constants/com-enum.js');
 const orderDao = new OrderDao();
 const productsLanguageDao = new ProductsLanguageDao();
 
@@ -107,11 +107,14 @@ class OrderService {
   async searchOrderInfo(joken) {
     var orderInfors = {
       totalAmount: 0,
+      totalCount: 0,
       PRICE_CURRENCY: "",
       orderList: []
     };
     var orderList = await orderDao.getOrderInfo(joken);
+    var totalCount = await orderDao.getOrderInfoCount(joken);
     orderInfors.orderList = orderList;
+    orderInfors.totalCount = totalCount;
 
     return orderInfors;
   }

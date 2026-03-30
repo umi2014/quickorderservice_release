@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db/pool'); // 共通化された接続プールをインポート
+const pool = require('../../db/pool'); // 共通化された接続プールをインポート
 
 // ユーザー一覧を取得
 router.get('/', (req, res) => {

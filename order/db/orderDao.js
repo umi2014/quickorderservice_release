@@ -1,4 +1,4 @@
-const pool = require('./pool'); // 共通化された接続プールをインポート
+const pool = require('../../db/pool'); // 共通化された接続プールをインポート
 
 class OrdersDao {
   constructor() {
@@ -85,6 +85,70 @@ class OrdersDao {
     } catch (err) {
       console.error('Error executing query:', err.stack);
       throw new Error('Failed to fetch orders by order ID');
+    }
+  }
+
+  /**
+   * 指定した検索条件のオーダ件数を取得
+   * @param joken 検索条件
+   * @returns {Promise<number>} オーダ件数
+   */
+  async getOrderInfoCount(joken) {
+    try {
+      var sql = "select count(*) as totalCount from orders a " +
+        "where a.SHOP_ID = ? ";
+      var params = [joken.shopId];
+      if (joken.customerName) {
+        sql += " and a.CUSTOMER_NAME like ? ";
+        params.push("%" + joken.customerName + "%");
+      }
+      if (joken.coordinatorName) {
+        sql += " and a.COORDINATOR_NAME like ? ";
+        params.push("%" + joken.coordinatorName + "%");
+      }
+      if (joken.orderStatus) {
+        sql += " and a.ORDERED_FLG = ? ";
+        params.push(joken.orderStatus);
+      }
+      if (joken.orderKey) {
+        sql += " and a.ORDER_KEY = ? ";
+        params.push(joken.orderKey);
+      }
+      if (joken.updateStatus) {
+        sql += " and a.ORDER_UPDATE_FLG = ? ";
+        params.push(joken.updateStatus);
+      }
+      if (joken.cancelStatus) {
+        sql += " and a.CANCEL_FLG = ? ";
+        params.push(joken.cancelStatus);
+      }
+      if (joken.eventDateFrom) {
+        sql += " and STR_TO_DATE(a.EVENT_DATE,'%Y年%m月%d日') >= ? ";
+        params.push(joken.eventDateFrom);
+      }
+      if (joken.eventDateTo) {
+        sql += " and STR_TO_DATE(a.EVENT_DATE,'%Y年%m月%d日') <= ? ";
+        params.push(joken.eventDateTo);
+      }
+      if (joken.dateFrom) {
+        sql += " and a.ORDERED_TIME >= ? ";
+        params.push(joken.dateFrom);
+      }
+      if (joken.dateTo) {
+        sql += " and a.ORDERED_TIME <= ? ";
+        params.push(joken.dateTo);
+      }
+      console.debug("SQL:" + sql);
+      console.debug("PARAM:" + params);
+      const results = await this.pool.query(sql, params);
+      if (results && results.length > 0) {
+        return results[0][0].totalCount;
+      } else {
+        return 0;
+      }
+    } catch (err) {
+      console.error('Error executing query:', err.stack);
+      throw new Error('Failed to fetch orders count');
     }
   }
 

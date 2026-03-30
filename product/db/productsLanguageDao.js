@@ -1,4 +1,4 @@
-const pool = require('./pool'); // 共通化された接続プールをインポート
+const pool = require('../../db/pool'); // 共通化された接続プールをインポート
 
 class ProductsLanguageDao {
   constructor() {

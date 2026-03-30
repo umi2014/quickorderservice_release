@@ -22,15 +22,20 @@ router.post('/01/', async (req, res) => {
 // メール情報一覧を取得
 router.post('/02/', async (req, res) => {
   const corporationId = req.body.corporationId;
+  const joken = req.body.joken || {};
+  joken.shopId = corporationId;
+
   if (!corporationId) {
     return res.status(400).json({ error: 'corporationId is required' });
   }
-  var joken = {};
-  joken.shopId = corporationId;
+
   try {
-    var mailInfoList = await emailInfoService.getEmailInfoList(joken);
-    var data = {}
-    data.mailInfoList = mailInfoList;
+    const mailInfoList = await emailInfoService.getEmailInfoList(joken);
+    const totalCount = await emailInfoService.getEmailInfoCount(joken);
+    const data = {
+      mailInfoList,
+      totalCount
+    };
     res.json(data);
   } catch (err) {
     console.error('Error fetching mailInfoList:', err.message);

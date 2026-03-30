@@ -1,5 +1,5 @@
 const imaps = require("imap-simple");
-const pool = require('../db/pool');
+const pool = require('../../db/pool');
 const { simpleParser } = require("mailparser");
 const EmailSettingDao = require("../db/emailSettingDao.js");
 const emailSettingDao = new EmailSettingDao();
@@ -7,11 +7,11 @@ const EmailInfoDao = require("../db/emailInfoDao.js");
 const emailInfoDao = new EmailInfoDao();
 const OrderEmailMappingSettingDao = require("../db/orderEmailMappingSettingDao.js");
 const orderEmailMappingSettingDao = new OrderEmailMappingSettingDao();
-const TableDao = require("../db/tableDao.js");
+const TableDao = require("../../system/db/tableDao.js");
 const tableDao = new TableDao();
-const OrderDao = require("../db/orderDao.js");
+const OrderDao = require("../../order/db/orderDao.js");
 const orderDao = new OrderDao();
-const OrderDetailDao = require("../db/orderDetailDao.js");
+const OrderDetailDao = require("../../order/db/orderDetailDao.js");
 const orderDetailDao = new OrderDetailDao();
 
 class EmailInfoService {
@@ -42,8 +42,10 @@ class EmailInfoService {
         const connection = await imaps.connect(config);
         await connection.openBox("INBOX");
 
-        // 最新メール 10件を取得
-        const searchCriteria = ["UNSEEN"];
+        // 过去3天内的邮件を取得
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        const searchCriteria = [['SINCE', threeDaysAgo]];
         const fetchOptions = { bodies: ["", "TEXT"], markSeen: false };
 
         const results = await connection.search(searchCriteria, fetchOptions);
@@ -61,7 +63,15 @@ class EmailInfoService {
           mailInfo.SUBJECT = parsed.subject;
           mailInfo.CONTENT = parsed.text;
           mailInfo.FROM = parsed.from.text;
-          mailInfo.DATE = new Date();
+          mailInfo.DATE = mail.attributes.date;
+
+          // 判断是否已经存在
+          const exists = await emailInfoDao.isEmailExists(mailInfo);
+          if (exists) {
+            console.log(`Email already exists, skipping: SUBJECT=${mailInfo.SUBJECT}, DATE=${mailInfo.DATE}`);
+            continue;
+          }
+
           await emailInfoDao.insEmailInfo(mailInfo);
           // ---- 既読にする ----
           const uid = mail.attributes.uid;
@@ -94,9 +104,19 @@ class EmailInfoService {
   }
 
   /**
+   * 指定したショップIDのメール総件数を取得
+   * @param {Object} joken 条件
+   * @returns {Promise<number>} 総件数
+   */
+  async getEmailInfoCount(joken) {
+    var count = await emailInfoDao.getEmailInfoCount(joken);
+    return count;
+  }
+
+  /**
    * 指定したメールIDのメール情報を取得
    * @param mailId メールID
-   * @returns {Promise} メール情報データ
+   * @returns {Promise} メール情報数据
    */
   async getEmailInfo(mailId) {
 
@@ -139,6 +159,9 @@ class EmailInfoService {
     return orderEmailMappingSettings;
   }
 
+  /**
+   * 分析メール情報、注文情報作成
+   */
   async analysitMailToOrder(emailInfo, orderEmailMappingSettings) {
     console.debug(`[Start] Parsing Email ID: ${emailInfo.EMAIL_ID}`);
 
@@ -152,6 +175,7 @@ class EmailInfoService {
       const tableId = await this._getOrCreateTable(emailInfo.SHOP_ID, orderEmailMappingSettings[9].START);
 
       // 2. 解析邮件内容，提取 Header 和 Details
+      emailInfo.CONTENT = emailInfo.SUBJECT + "\r\n" + emailInfo.CONTENT;
       const { orderHeader, detailList } = this._parseEmailContent(emailInfo.CONTENT, orderEmailMappingSettings);
 
       // 3. 完善订单主表信息
@@ -174,7 +198,7 @@ class EmailInfoService {
         // 4. 执行持久化（主表 -> 明细表）
         // 这里的 orderDao.insertOrder 必须返回包含 insertId 的对象
         const result = await orderDao.insertOrder(orderData);
-        const newOrderId = result.ORDER_ID || result; 
+        const newOrderId = result.ORDER_ID || result;
 
         if (newOrderId > 0 && detailList.length > 0) {
           await orderDetailDao.insertOrderDetails(detailList, newOrderId);
@@ -188,12 +212,12 @@ class EmailInfoService {
     }
   }
 
-/**
-   * 真正驱动化的解析逻辑
-   */
+  /**
+     * 解析邮件内容逻辑
+     */
   _parseEmailContent(content, settings) {
     const lines = content.split(/\r?\n/);
-    
+
     // 从配置中自动寻找边界标记
     const areaSetting = settings.find(s => s.SETTING_TYPE === 0);
     const startMarker = areaSetting ? areaSetting.START : null;
@@ -219,7 +243,7 @@ class EmailInfoService {
           // 如果字段名是 CANCEL_FLG，特殊处理
           if (set.FIELD_NAME === 'CANCEL_FLG') {
             orderHeader[set.FIELD_NAME] = "1";
-          } else if (set.SETTING_TYPE === 7) { 
+          } else if (set.SETTING_TYPE === 7) {
             // 合计金额特殊逻辑：数值和币种
             orderHeader[set.FIELD_NAME] = this._cleanNum(val);
             const parts = line.split(set.END);
@@ -227,7 +251,7 @@ class EmailInfoService {
           } else {
             // 根据字段名自动赋值
             orderHeader[set.FIELD_NAME] = set.FIELD_NAME.includes('PRICE') || set.FIELD_NAME.includes('TAX') || set.FIELD_NAME.includes('POSTAGE') || set.FIELD_NAME.includes('AMONT')
-              ? this._cleanNum(val) 
+              ? this._cleanNum(val)
               : val;
           }
         }
@@ -243,10 +267,10 @@ class EmailInfoService {
         const prodNameSetting = settings.find(s => s.SETTING_TYPE === 1);
         if (line.includes(prodNameSetting.START)) {
           if (currentDetail) detailList.push(currentDetail);
-          currentDetail = { 
-            [prodNameSetting.FIELD_NAME]: this._extractValue(line, prodNameSetting) 
+          currentDetail = {
+            [prodNameSetting.FIELD_NAME]: this._extractValue(line, prodNameSetting)
           };
-        } 
+        }
         else if (currentDetail) {
           // 遍历所有属于明细的配置（单价、数量等）
           detailSettings.filter(s => s.SETTING_TYPE !== 1).forEach(set => {
@@ -256,8 +280,8 @@ class EmailInfoService {
               //    const match = afterStart.match(/^\s*(\d+)/);
               //    if (match) currentDetail[set.FIELD_NAME] = match[1];
               // } else {
-                 const val = this._extractValue(line, set);
-                 currentDetail[set.FIELD_NAME] = this._cleanNum(val);
+              const val = this._extractValue(line, set);
+              currentDetail[set.FIELD_NAME] = this._cleanNum(val);
               // }
             }
           });
@@ -282,10 +306,18 @@ class EmailInfoService {
           const val = this._extractValue(content, set);
           orderHeader[set.FIELD_NAME] = val;
         }
+      } else if (set.FIELD_NAME === 'ORDER_NAME') {
+        // 変更内容
+        if (content.includes(set.START)) {
+          orderHeader[set.FIELD_NAME] = set.DEFAULT_VALUE;
+        }
       }
     });
-    if (currentDetail) detailList.push(currentDetail);
-
+    if (currentDetail) {
+      detailList.push(currentDetail);
+    } else {
+      orderHeader["ORDER_UPDATE_FLG"] = "1";
+    }
     return { orderHeader, detailList };
   }
 
