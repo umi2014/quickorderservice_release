@@ -66,18 +66,22 @@ class OrderService {
       PRICE_CURRENCY: "",
       orderList: []
     };
-    var status = undefined;
+    var joken = {};
+    joken.shopId = shopId;
+    joken.tableId = tableId;
+    joken.subTableId = subTableId;
+    joken.getAllFlg = true;
     // お客様の場合
     if (!rollId) {
-      status = " and PAYED_FLG<>'1'";
+      joken.status = " and PAYED_FLG<>'1'";
     } else if (comEnum.Roll_ITEM.KITCHEN.val == rollId) {
       // 厨房の場合
-      status = " and ORDERED_FLG='1' and (PREPARE_FLG='0' or SERVING_FLG='0')";
+      joken.status = " and ORDERED_FLG='1' and (PREPARE_FLG='0' or SERVING_FLG='0')";
     } else if (comEnum.Roll_ITEM.CASHIER.val == rollId) {
       // レンジの場合
-      status = " and SERVING_FLG='1' and (PAYED_FLG='0' or CANCEL_FLG='0')";
+      joken.status = " and SERVING_FLG='1' and (PAYED_FLG='0' or CANCEL_FLG='0')";
     }
-    var orderList = await orderDao.getOrderInfo(shopId, tableId, subTableId, status);
+    var orderList = await orderDao.getOrderInfo(joken);
     if (orderList && orderList.length > 0) {
       for (var i = 0; i < orderList.length; i++) {
         var orderInfo = orderList[i];

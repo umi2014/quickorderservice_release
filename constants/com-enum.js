@@ -26,6 +26,10 @@ const comEnum = {
     REFUND_ORDER: {
       val: "5",
       dispname: "返金済み"
+    },
+    PURCHASE_ERROR: {
+      val: "9",
+      dispname: "支払いエラー"
     }
   },
   /** アクセス権限 */
@@ -45,6 +49,38 @@ const comEnum = {
     OWNER: {
       val: "4",
       dispname: "オーナー"
+    }
+  },
+  Currency: {
+    JPY: {
+      val: "JPY",
+      dispname: "円"
+    },
+    USD: {
+      val: "USD",
+      dispname: "ドル"
+    },
+    CNY: {
+      val: "CNY",
+      dispname: "元"
+    }
+  },
+  EnumSquareOrderStatus: {
+    APPROVED: {
+      val: "APPROVED",
+      dispname: "承認済み"
+    },
+    COMPLETED: {
+      val: "COMPLETED",
+      dispname: "支払い完了"
+    },
+    PENDING: {
+      val: "PENDING",
+      dispname: "保留"
+    },
+    INVALID: {
+      val: "INVALID",
+      dispname: "無効"
     }
   },
   /** 勘定科目レベル1 */

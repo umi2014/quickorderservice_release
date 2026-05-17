@@ -156,6 +156,12 @@ class EmailInfoService {
 
     var orderEmailMappingSettings = await orderEmailMappingSettingDao.getOrderEmailMappingSettingInfo(shopId);
 
+    // 将数据库读取出来的字面量 '\\r' 和 '\\n' 转换为真正的换行符
+    orderEmailMappingSettings.forEach(s => {
+      if (s.START) s.START = s.START.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
+      if (s.END) s.END = s.END.replace(/\\r/g, '\r').replace(/\\n/g, '\n');
+    });
+
     return orderEmailMappingSettings;
   }
 
@@ -208,7 +214,7 @@ class EmailInfoService {
       return 1;
     } catch (error) {
       console.error("[Error] analysis failed:", error);
-      throw error;
+      return 0;
     }
   }
 
@@ -219,10 +225,25 @@ class EmailInfoService {
     const lines = content.split(/\r?\n/);
 
     // 从配置中自动寻找边界标记
-    const areaSetting = settings.find(s => s.SETTING_TYPE === 0);
-    const startMarker = areaSetting ? areaSetting.START : null;
-    const endMarker = areaSetting ? areaSetting.END : null;
+    const areaSetting = settings.filter(s => s.FIELD_NAME === "ORDER_START");
+    let haveOrderInfoFlg = false;
+    let startMarker = null;
+    let endMarker = null;
+    for (let areaSet of areaSetting) {
+      startMarker = areaSet ? areaSet.START : null;
+      endMarker = areaSet ? areaSet.END : null;
 
+      if (startMarker == null || endMarker == null) {
+        throw new Error("emailContent analytics: No start or end marker found");
+      }
+      if (content.includes(startMarker) || content.includes(endMarker)) {
+        haveOrderInfoFlg = true;
+        break;
+      }
+    }
+    if (!haveOrderInfoFlg) {
+      throw new Error("emailContent analytics: No start or end marker found");
+    }
     let orderHeader = { CANCEL_FLG: "0" };
     let detailList = [];
     let currentDetail = null;
@@ -307,14 +328,23 @@ class EmailInfoService {
           orderHeader[set.FIELD_NAME] = val;
         }
       } else if (set.FIELD_NAME === 'ORDER_NAME') {
-        // 変更内容
-        if (content.includes(set.START)) {
-          orderHeader[set.FIELD_NAME] = set.DEFAULT_VALUE;
+        // 店名
+        if (content.includes(set.START) && content.includes(set.END)) {
+          const val = this._extractValue(content, set);
+          orderHeader[set.FIELD_NAME] = val;
         }
       }
     });
-    if (currentDetail) {
-      detailList.push(currentDetail);
+    if (detailList.length > 0) {
+      // 计算总金额
+      var totalAmont = 0;
+      for (var i = 0; i < detailList.length; i++) {
+        var detail = detailList[i];
+        if (detail.PRICE) {
+          totalAmont += detail.PRICE * detail.NUMBER;
+        }
+      }
+      orderHeader["AMONT"] = totalAmont;
     } else {
       orderHeader["ORDER_UPDATE_FLG"] = "1";
     }
@@ -326,9 +356,10 @@ class EmailInfoService {
    */
   _extractValue(line, setting) {
     try {
-      if (!line.includes(setting.START)) return "";
+      // if (!line.includes(setting.START)) return "";
       const temp = line.split(setting.START)[1];
-      if (setting.END && temp.includes(setting.END)) {
+      //  && temp.includes(setting.END)
+      if (setting.END) {
         return temp.split(setting.END)[0].trim();
       }
       return temp.trim(); // 没有结束符则取剩余全部

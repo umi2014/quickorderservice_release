@@ -23,11 +23,15 @@ class OrdersDao {
       }
       if (joken.customerName) {
         sql += " and a.CUSTOMER_NAME like ? ";
-        params.push("%"+joken.customerName+"%");
+        params.push("%" + joken.customerName + "%");
       }
       if (joken.coordinatorName) {
         sql += " and a.COORDINATOR_NAME like ? ";
-        params.push("%"+joken.coordinatorName+"%");
+        params.push("%" + joken.coordinatorName + "%");
+      }
+      if (joken.orderName) {
+        sql += " and a.ORDER_NAME like ? ";
+        params.push("%" + joken.orderName + "%");
       }
       if (joken.orderStatus) {
         sql += " and a.ORDERED_FLG = ? ";
@@ -60,17 +64,21 @@ class OrdersDao {
       if (joken.dateTo) {
         sql += " and a.ORDERED_TIME <= ? ";
         params.push(joken.dateTo);
-      } 
-      sql +="order by a.SHOP_ID asc,a.ORDER_ID desc "
-      if  (joken.offset) {
-        sql +="LIMIT ?,20; "
+      }
+      if (joken.status) {
+        sql += joken.status;
+      }
+      sql += "order by a.SHOP_ID asc,a.ORDER_ID desc "
+      if (joken.getAllFlg) {
+      } else if (joken.offset) {
+        sql += "LIMIT ?,20; "
         if (joken.offset > 0) {
           params.push(joken.offset);
         } else {
           params.push(0);
         }
-      } else{
-        sql +="LIMIT 20; "
+      } else {
+        sql += "LIMIT 20; "
       }
       console.debug("SQL:" + sql);
       console.debug("PARAM:" + params);
@@ -105,6 +113,10 @@ class OrdersDao {
       if (joken.coordinatorName) {
         sql += " and a.COORDINATOR_NAME like ? ";
         params.push("%" + joken.coordinatorName + "%");
+      }
+      if (joken.orderName) {
+        sql += " and a.ORDER_NAME like ? ";
+        params.push("%" + joken.orderName + "%");
       }
       if (joken.orderStatus) {
         sql += " and a.ORDERED_FLG = ? ";

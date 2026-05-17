@@ -100,6 +100,7 @@ router.post('/05/', async (req, res) => {
   joken.shopId = corporationId
   joken.TORIKOMI_FLG = "0";
   joken.DELETE_FLG = "0";
+  joken.getAllFlg = true;
   try {
     var mailInfoList = await emailInfoService.getEmailInfoList(joken);
     var orderEmailMappingSettings = await emailInfoService.getOrderEmailMappingSettings(corporationId);

@@ -7,18 +7,22 @@ class ProductsDao {
 
   /**
    * 指定したショップIDの商品一覧を取得
-   * @param {number} shopId ショップID
+   * @param {number} joken 検索条件
    * @returns {Promise<Array>} 商品データの配列
    */
-  async getProductsByShopId(shopId) {
+  async getProductsByShopId(joken) {
     try {
       // クエリの実行
       var sql = "SELECT * FROM products WHERE SHOP_ID = ? ";
+      var params = [joken.shopId];
+      if (joken.productType) {
+        sql += "and PRODUCT_TYPE = ? ";
+        params.push(joken.productType);
+      }
       console.debug("SQL:" + sql);
-      console.debug("PARAM:" + shopId);
-      const results = await this.pool.query(
-        sql, [shopId]);
-      if (results && results.length > 0){
+      console.debug("PARAM:" + params);
+      const results = await this.pool.query(sql, params);
+      if (results && results.length > 0) {
         console.debug("result:" + results[0].length);
         return results[0];
       } else {

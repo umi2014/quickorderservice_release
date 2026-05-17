@@ -42,7 +42,8 @@ class EmailInfoDao {
 
       sql += " ORDER BY a.EMAIL_ID DESC ";
 
-      if (joken.offset != null) {
+      if (joken.getAllFlg) {
+      } else if (joken.offset != null) {
         sql += " LIMIT ?, 20 ";
         param.push(Number(joken.offset));
       } else {

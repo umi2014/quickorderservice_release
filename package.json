@@ -13,6 +13,7 @@
     "express": "^4.21.2",
     "imap-simple": "^5.1.0",
     "mailparser": "^3.7.4",
-    "mysql2": "^3.14.5"
+    "mysql2": "^3.14.5",
+    "square": "^44.0.1"
   }
 }

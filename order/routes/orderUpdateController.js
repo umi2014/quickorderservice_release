@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const OrderService = require('../service/orderService.js'); // 共通化された接続プールをインポート
+const OrderService = require('../service/orderService.js'); // オーダサービス
 const orderService = new OrderService();
 
 // オーダーステータスを更新する
